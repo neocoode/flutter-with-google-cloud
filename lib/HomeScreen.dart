@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -11,41 +12,73 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: [
+      'email',
+      'https://www.googleapis.com/auth/userinfo.profile',
+    ],
+  );
   User? _currentUser;
 
   @override
   void initState() {
     super.initState();
-    // Verifica se o usuário já está logado ao abrir a tela
+    _initializeFirebase();
+  }
+
+  Future<void> _initializeFirebase() async {
+    // Certifique-se de que o Firebase foi inicializado
+    await Firebase.initializeApp();
     _currentUser = _auth.currentUser;
+    print("Usuário logado atualmente: $_currentUser");
+    setState(() {});
   }
 
   Future<User?> _signInWithGoogle() async {
     try {
+      print("Tentando login com Google...");
+
+      // Faz login com o Google
+
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
+        print("Login cancelado pelo usuário");
         return null; // Usuário cancelou o login
       }
+
+      print(
+          "Login com Google bem-sucedido, usuário: ${googleUser.displayName}");
 
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
+      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
+        print("Erro: accessToken ou idToken está nulo.");
+        return null;
+      }
+
+      print("Access Token: ${googleAuth.accessToken}");
+      print("ID Token: ${googleAuth.idToken}");
+
+      print(
+          "Autenticação do Google obtida. Access Token: ${googleAuth.accessToken}");
+
+      // Usa o token do Google para autenticar no Firebase
       final OAuthCredential credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
+      // Faz o login no Firebase usando o token do Google
       final UserCredential userCredential =
           await _auth.signInWithCredential(credential);
+      final User? user = userCredential.user;
 
-      setState(() {
-        _currentUser = userCredential.user;
-      });
+      print("Login com Firebase bem-sucedido, usuário: ${user?.displayName}");
 
-      return userCredential.user;
-    } catch (e) {
-      print("Erro no login com Google: $e");
+      return user;
+    } catch (error) {
+      print("Erro no login com Google: $error");
       return null;
     }
   }
@@ -57,6 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _currentUser = null;
     });
+    print("Usuário deslogado");
   }
 
   @override
@@ -75,12 +109,18 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildSignInButton() {
     return ElevatedButton(
       onPressed: () async {
-        User? user = await _signInWithGoogle();
+        print("Tentando login...");
+        final user = await _signInWithGoogle();
         if (user != null) {
+          print("Login bem-sucedido: ${user.displayName}");
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("Bem-vindo, ${user.displayName}!")),
           );
+          setState(() {
+            _currentUser = user;
+          });
         } else {
+          print("Falha no login");
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Falha no login")),
           );

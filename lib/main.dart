@@ -4,7 +4,7 @@ import 'package:flutter_with_google_cloud/HomeScreen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(); // Inicializa o Firebase
   runApp(const MyApp());
 }
 
